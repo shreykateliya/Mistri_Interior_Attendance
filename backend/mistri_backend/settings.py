@@ -2,6 +2,18 @@ from pathlib import Path
 import os
 from decouple import config
 
+# EMAIL CONFIGURATION (Console Mode for Testing)
+# This will print emails to your Terminal instead of sending them.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# When you are ready for Real Gmail, uncomment these and add your details:
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-gmail@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your-app-password' # NOT your normal password
+
 # Base Directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
