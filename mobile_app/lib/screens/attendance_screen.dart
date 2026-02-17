@@ -6,17 +6,17 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart'; 
 import 'login_screen.dart';
-import 'settings_screen.dart'; // Import Settings
+import 'settings_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
-  final int id; // <--- ADDED ID
+  final int id;
   final String username;
   final String profilePic;
   final String initialStatus;
 
   const AttendanceScreen({
     super.key, 
-    required this.id, // <--- REQUIRED
+    required this.id, 
     required this.username, 
     required this.profilePic,
     required this.initialStatus
@@ -30,6 +30,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String _currentStatus = "OUT"; 
   String _timeString = "";
   bool _isLoading = false;
+
+  // --- NEW HELPER FUNCTION TO FIX IMAGE URL ---
+  String? _getValidImageUrl(String url) {
+    if (url.isEmpty) return null;
+    
+    // If it's already a full link (Cloudinary/Internet), return it
+    if (url.startsWith('http')) return url;
+    
+    // If it's a local link (Django), add the server IP
+    // CHANGE THIS IP IF YOUR WIFI CHANGES
+    return "http://192.168.1.6:8000$url";
+  }
+  // --------------------------------------------
 
   @override
   void initState() {
@@ -54,7 +67,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _handlePunch(String type) async {
     final picker = ImagePicker();
-    // Reduced quality to 30 to make upload faster/lighter
     final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 30);
     
     if (pickedFile == null) return;
@@ -64,7 +76,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     try {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
 
-      // CHECK YOUR IP
+      // CHANGE IP HERE
       var uri = Uri.parse("http://192.168.1.6:8000/api/punch-in/"); 
       var request = http.MultipartRequest('POST', uri);
       
@@ -73,11 +85,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       request.fields['latitude'] = position.latitude.toString();
       request.fields['longitude'] = position.longitude.toString();
       
-      // Attach the file safely
       request.files.add(await http.MultipartFile.fromPath('live_photo', pickedFile.path));
 
       var response = await request.send();
-      var responseBody = await response.stream.bytesToString(); // Read the error message
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         setState(() {
@@ -92,11 +102,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         }
       } else {
         setState(() => _isLoading = false);
-        print("Server Error Details: $responseBody"); // Print to terminal
-        if (mounted) {
-            // Show the REAL error from backend (e.g. "Employee not found")
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed: $responseBody")));
-        }
+        var responseBody = await response.stream.bytesToString();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed: $responseBody")));
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -107,13 +114,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     bool isPunchedIn = _currentStatus == 'IN';
+    // Use the helper function here
+    String? validProfileUrl = _getValidImageUrl(widget.profilePic);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text("My Dashboard"),
         actions: [
-          // SETTINGS BUTTON
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -133,10 +141,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             CircleAvatar(
               radius: 60,
               backgroundColor: Colors.grey[300],
-              backgroundImage: widget.profilePic.isNotEmpty 
-                  ? NetworkImage(widget.profilePic) 
+              // --- USE THE FIXED URL HERE ---
+              backgroundImage: validProfileUrl != null 
+                  ? NetworkImage(validProfileUrl) 
                   : null, 
-              child: widget.profilePic.isEmpty 
+              child: validProfileUrl == null 
                   ? const Icon(Icons.person, size: 60, color: Colors.grey) 
                   : null,
             ),
