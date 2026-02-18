@@ -24,7 +24,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.1.6:8000/api/forgot-password/"),
+        Uri.parse("http://192.168.1.4:8000/api/forgot-password/"),
         body: {"username": _userController.text.trim()}
       );
       var data = jsonDecode(response.body);

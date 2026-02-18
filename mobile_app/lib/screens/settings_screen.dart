@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'login_screen.dart';
+import '../config.dart';
 
 class SettingsScreen extends StatefulWidget {
   final int userId;
@@ -23,10 +24,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_passController.text.isEmpty) return;
     setState(() => _isLoading = true);
     
-    // CHANGE IP HERE IF NEEDED
+    // Uses Config
     try {
       await http.post(
-        Uri.parse("http://192.168.1.6:8000/api/change-password/"),
+        Uri.parse(Config.changePassword),
         body: {
           "id": widget.userId.toString(),
           "role": widget.role,
@@ -49,13 +50,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     if (pickedFile != null) {
       setState(() => _isLoading = true);
-      var request = http.MultipartRequest('POST', Uri.parse("http://192.168.1.6:8000/api/update-profile-pic/"));
+      // Uses Config
+      var request = http.MultipartRequest('POST', Uri.parse(Config.updateProfilePic));
       request.fields['id'] = widget.userId.toString();
       request.files.add(await http.MultipartFile.fromPath('profile_pic', pickedFile.path));
       
-      var response = await request.send();
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Pic Updated! (Re-login to see changes)")));
+      try {
+        var response = await request.send();
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Pic Updated! (Re-login to see changes)")));
+        }
+      } catch (e) {
+         print("Error: $e");
       }
       setState(() => _isLoading = false);
     }

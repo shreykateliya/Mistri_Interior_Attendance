@@ -5,6 +5,7 @@ import 'attendance_screen.dart';
 import 'admin_screen.dart';
 import 'signup_screen.dart'; 
 import 'forgot_password_screen.dart';
+import '../config.dart'; // <--- Ensure this points to your config.dart
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,11 +22,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     setState(() => _isLoading = true);
-    final String url = "http://192.168.1.6:8000/api/login/";
     
+    // Uses Config.login (No more hardcoded IP or 'url' variable)
     try {
       var response = await http.post(
-        Uri.parse(url),
+        Uri.parse(Config.login),
         body: {
           "username": _userController.text.trim(),
           "password": _passController.text.trim() 
@@ -53,9 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _message = "❌ Login Failed: ${data['message']}");
       }
     } catch (e) {
-      setState(() => _message = "Connection Error. Check IP.");
+      setState(() => _message = "Connection Error. Check IP in config.dart");
+      print("Login Error: $e");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -98,22 +100,22 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             const SizedBox(height: 20),
             
-            // This line was causing the error before because SignUpScreen wasn't a class
             TextButton(
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen()));
               },
               child: const Text("New Employee? Sign Up Here"),
             ),
+            
+            TextButton(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()));
+              },
+              child: const Text("Forgot Password?", style: TextStyle(color: Colors.grey)),
+            ),
+
             const SizedBox(height: 10),
             Text(_message, style: const TextStyle(color: Colors.red)),
-            // Under the "Sign Up" button
-TextButton(
-  onPressed: () {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()));
-  },
-  child: const Text("Forgot Password?", style: TextStyle(color: Colors.grey)),
-),
           ],
         ),
       ),

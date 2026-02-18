@@ -1,3 +1,4 @@
+// lib/screens/attendance_screen.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart'; 
 import 'login_screen.dart';
 import 'settings_screen.dart';
+import '../config.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final int id;
@@ -30,27 +32,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String _currentStatus = "OUT"; 
   String _timeString = "";
   bool _isLoading = false;
+  Timer? _timer; // Variable to hold the timer
 
-  // --- NEW HELPER FUNCTION TO FIX IMAGE URL ---
   String? _getValidImageUrl(String url) {
     if (url.isEmpty) return null;
-    
-    // If it's already a full link (Cloudinary/Internet), return it
     if (url.startsWith('http')) return url;
-    
-    // If it's a local link (Django), add the server IP
-    // CHANGE THIS IP IF YOUR WIFI CHANGES
-    return "http://192.168.1.6:8000$url";
+    return "${Config.baseUrl}$url";
   }
-  // --------------------------------------------
 
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.initialStatus;
     _timeString = _formatDateTime(DateTime.now());
-    Timer.periodic(const Duration(seconds: 1), (Timer t) => _getTime());
+    // Assign timer to variable so we can cancel it later
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) => _getTime());
   }
+
+  // --- CRITICAL FIX: Kill the timer when leaving screen ---
+  @override
+  void dispose() {
+    _timer?.cancel(); 
+    super.dispose();
+  }
+  // --------------------------------------------------------
 
   void _getTime() {
     final DateTime now = DateTime.now();
@@ -71,13 +76,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     
     if (pickedFile == null) return;
 
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
 
     try {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
 
-      // CHANGE IP HERE
-      var uri = Uri.parse("http://192.168.1.6:8000/api/punch-in/"); 
+      var uri = Uri.parse(Config.punchIn); 
       var request = http.MultipartRequest('POST', uri);
       
       request.fields['employee_id'] = widget.username;
@@ -90,23 +94,23 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       var response = await request.send();
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        setState(() {
-          _currentStatus = type; 
-          _isLoading = false;
-        });
         if (mounted) {
+          setState(() {
+            _currentStatus = type; 
+            _isLoading = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text("Successfully Punched $type!"), 
             backgroundColor: type == 'IN' ? Colors.green : Colors.red
           ));
         }
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
         var responseBody = await response.stream.bytesToString();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed: $responseBody")));
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
@@ -114,7 +118,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     bool isPunchedIn = _currentStatus == 'IN';
-    // Use the helper function here
     String? validProfileUrl = _getValidImageUrl(widget.profilePic);
 
     return Scaffold(
@@ -141,7 +144,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             CircleAvatar(
               radius: 60,
               backgroundColor: Colors.grey[300],
-              // --- USE THE FIXED URL HERE ---
               backgroundImage: validProfileUrl != null 
                   ? NetworkImage(validProfileUrl) 
                   : null, 

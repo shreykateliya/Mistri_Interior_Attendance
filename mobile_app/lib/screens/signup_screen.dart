@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../config.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -16,10 +17,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _signUp() async {
     setState(() => _isLoading = true);
-    // CHANGE IP HERE IF NEEDED
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.1.6:8000/api/signup/"),
+        Uri.parse(Config.signup), // <--- FIXED: Added comma here
         body: {
           "username": _userController.text.trim(),
           "password": _passController.text.trim()

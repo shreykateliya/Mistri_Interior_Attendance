@@ -9,7 +9,9 @@ from .models import AttendanceLog, Employee
 from .serializers import AttendanceLogSerializer
 import random
 from django.core.mail import send_mail
-
+import calendar
+from datetime import datetime
+from django.db.models import Q
 
 
 # 1. GENERATE OTP & SEND EMAIL
@@ -199,3 +201,83 @@ def force_logout(request):
     emp_id = request.data.get('employee_id')
     AttendanceLog.objects.create(employee_id=emp_id, type='OUT', forced_by_admin=True)
     return Response({"status": "success"})
+
+
+
+@api_view(['GET'])
+def monthly_report(request):
+    emp_id = request.query_params.get('employee_id')
+    month = int(request.query_params.get('month', datetime.now().month))
+    year = int(request.query_params.get('year', datetime.now().year))
+    
+    try:
+        emp = Employee.objects.get(id=emp_id)
+        
+        # 1. Get all logs for this month
+        logs = AttendanceLog.objects.filter(
+            employee=emp, 
+            timestamp__month=month, 
+            timestamp__year=year
+        ).order_by('timestamp')
+        
+        # 2. Process Data Day by Day
+        report = []
+        num_days = calendar.monthrange(year, month)[1]
+        
+        present_days = 0
+        missed_out_days = 0
+        
+        # Create a map of logs by day
+        logs_by_day = {}
+        for log in logs:
+            day = log.timestamp.day
+            if day not in logs_by_day: logs_by_day[day] = []
+            logs_by_day[day].append(log)
+            
+        for day in range(1, num_days + 1):
+            day_logs = logs_by_day.get(day, [])
+            status = "Absent"
+            details = "-"
+            
+            if day_logs:
+                first_in = next((l for l in day_logs if l.type == 'IN'), None)
+                last_out = next((l for l in reversed(day_logs) if l.type == 'OUT'), None)
+                
+                if first_in and last_out:
+                    status = "Present"
+                    details = f"{first_in.timestamp.strftime('%H:%M')} - {last_out.timestamp.strftime('%H:%M')}"
+                    present_days += 1
+                elif first_in and not last_out:
+                    status = "Forgot Out"
+                    details = f"{first_in.timestamp.strftime('%H:%M')} - ?"
+                    missed_out_days += 1
+                    present_days += 1 # Still counts as present usually
+                
+            report.append({
+                "day": day,
+                "date": f"{year}-{month:02d}-{day:02d}",
+                "status": status,
+                "details": details
+            })
+            
+        return Response({
+            "employee": emp.name,
+            "summary": {
+                "total_present": present_days,
+                "total_absent": num_days - present_days,
+                "forgot_out": missed_out_days
+            },
+            "daily_data": report
+        })
+
+    except Employee.DoesNotExist:
+        return Response({"error": "Employee not found"}, status=400)
+
+@api_view(['DELETE'])
+def delete_log(request, log_id):
+    try:
+        log = AttendanceLog.objects.get(id=log_id)
+        log.delete()
+        return Response({"status": "success", "message": "Entry Deleted"})
+    except AttendanceLog.DoesNotExist:
+        return Response({"error": "Log not found"}, status=404)

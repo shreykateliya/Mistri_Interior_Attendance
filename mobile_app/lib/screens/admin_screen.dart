@@ -1,7 +1,10 @@
+// lib/screens/admin_screen.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'login_screen.dart';
+import 'report_screen.dart'; 
+import '../config.dart'; // <--- We MUST use this
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -14,6 +17,14 @@ class _AdminScreenState extends State<AdminScreen> {
   List employees = [];
   bool _isLoading = true;
 
+  // Helper for images
+  String? _getValidImageUrl(String url) {
+    if (url.isEmpty) return null;
+    if (url.startsWith('http')) return url;
+    // USE CONFIG, NOT HARDCODED IP
+    return "${Config.baseUrl}$url";
+  }
+
   @override
   void initState() {
     super.initState();
@@ -21,24 +32,27 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _fetchDashboard() async {
-    final String url = "http://192.168.1.6:8000/api/admin/dashboard/";
+    // USE CONFIG
     try {
-      var response = await http.get(Uri.parse(url));
-      setState(() {
-        employees = jsonDecode(response.body);
-        _isLoading = false;
-      });
+      var response = await http.get(Uri.parse(Config.adminDashboard));
+      if (mounted) {
+        setState(() {
+          employees = jsonDecode(response.body);
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print("Error: $e");
     }
   }
 
   Future<void> _forceLogout(int empId, String name) async {
-    final String url = "http://192.168.1.6:8000/api/admin/force-logout/";
-    await http.post(Uri.parse(url), body: {"employee_id": empId.toString()});
+    await http.post(Uri.parse(Config.forceLogout), body: {"employee_id": empId.toString()});
     
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Forced logout for $name")));
-    _fetchDashboard(); // Refresh list
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Forced logout for $name")));
+    }
+    _fetchDashboard(); 
   }
 
   @override
@@ -58,15 +72,19 @@ class _AdminScreenState extends State<AdminScreen> {
             itemBuilder: (context, index) {
               var emp = employees[index];
               bool isWorking = emp['is_working'];
+              String? profileUrl = _getValidImageUrl(emp['profile_pic']);
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: ListTile(
+                  onTap: () {
+                     Navigator.push(context, MaterialPageRoute(builder: (_) => ReportScreen(userId: emp['id'], role: 'admin')));
+                  },
                   leading: CircleAvatar(
-                    backgroundImage: emp['profile_pic'] != "" 
-                        ? NetworkImage(emp['profile_pic']) 
+                    backgroundImage: profileUrl != null 
+                        ? NetworkImage(profileUrl) 
                         : null,
-                    child: emp['profile_pic'] == "" ? const Icon(Icons.person) : null,
+                    child: profileUrl == null ? const Icon(Icons.person) : null,
                   ),
                   title: Text(emp['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(isWorking ? "🟢 Working Now" : "⚪ Offline (Last: ${emp['last_seen']})"),
