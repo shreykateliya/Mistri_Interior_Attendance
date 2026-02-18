@@ -204,6 +204,8 @@ def force_logout(request):
 
 
 
+# backend/attendance/views.py
+
 @api_view(['GET'])
 def monthly_report(request):
     emp_id = request.query_params.get('employee_id')
@@ -220,21 +222,29 @@ def monthly_report(request):
             timestamp__year=year
         ).order_by('timestamp')
         
-        # 2. Process Data Day by Day
+        # 2. Setup Data
         report = []
         num_days = calendar.monthrange(year, month)[1]
+        today = datetime.now()
         
         present_days = 0
         missed_out_days = 0
+        forced_out_days = 0 # New Counter
         
-        # Create a map of logs by day
+        # Group logs by day
         logs_by_day = {}
         for log in logs:
             day = log.timestamp.day
             if day not in logs_by_day: logs_by_day[day] = []
             logs_by_day[day].append(log)
             
+        # 3. Process Day by Day
         for day in range(1, num_days + 1):
+            # Stop processing if date is in the future
+            current_date = datetime(year, month, day)
+            if current_date > today:
+                break 
+
             day_logs = logs_by_day.get(day, [])
             status = "Absent"
             details = "-"
@@ -243,15 +253,22 @@ def monthly_report(request):
                 first_in = next((l for l in day_logs if l.type == 'IN'), None)
                 last_out = next((l for l in reversed(day_logs) if l.type == 'OUT'), None)
                 
-                if first_in and last_out:
-                    status = "Present"
-                    details = f"{first_in.timestamp.strftime('%H:%M')} - {last_out.timestamp.strftime('%H:%M')}"
-                    present_days += 1
-                elif first_in and not last_out:
-                    status = "Forgot Out"
-                    details = f"{first_in.timestamp.strftime('%H:%M')} - ?"
-                    missed_out_days += 1
-                    present_days += 1 # Still counts as present usually
+                if first_in:
+                    if last_out:
+                        # Check if it was forced
+                        if last_out.forced_by_admin:
+                            status = "Forced Out"
+                            details = f"{first_in.timestamp.strftime('%H:%M')} - {last_out.timestamp.strftime('%H:%M')} (Admin)"
+                            forced_out_days += 1
+                        else:
+                            status = "Present"
+                            details = f"{first_in.timestamp.strftime('%H:%M')} - {last_out.timestamp.strftime('%H:%M')}"
+                            present_days += 1
+                    else:
+                        status = "Forgot Out"
+                        details = f"{first_in.timestamp.strftime('%H:%M')} - ?"
+                        missed_out_days += 1
+                        present_days += 1
                 
             report.append({
                 "day": day,
@@ -264,8 +281,9 @@ def monthly_report(request):
             "employee": emp.name,
             "summary": {
                 "total_present": present_days,
-                "total_absent": num_days - present_days,
-                "forgot_out": missed_out_days
+                "total_absent": (today.day if today.month == month else num_days) - present_days,
+                "forgot_out": missed_out_days,
+                "forced_out": forced_out_days
             },
             "daily_data": report
         })
