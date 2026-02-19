@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:url_launcher/url_launcher.dart'; // <--- NEW
+import 'package:url_launcher/url_launcher.dart'; 
 import '../config.dart';
 
 class ReportScreen extends StatefulWidget {
@@ -15,7 +15,7 @@ class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key, required this.userId, required this.role});
 
   @override
-  _ReportScreenState createState() => _ReportScreenState();
+  State<ReportScreen> createState() => _ReportScreenState(); // <--- FIXED
 }
 
 class _ReportScreenState extends State<ReportScreen> {
@@ -42,27 +42,24 @@ class _ReportScreenState extends State<ReportScreen> {
         });
       }
     } catch (e) {
-      print("Error: $e");
+      debugPrint("Error: $e"); // <--- FIXED
     }
   }
 
-  // Helper to fix image URLs
   String? _getValidImageUrl(String url) {
     if (url.isEmpty) return null;
     if (url.startsWith('http')) return url;
     return "${Config.baseUrl}$url";
   }
 
-  // --- NEW: Open Google Maps ---
   Future<void> _openMap(String loc) async {
     if (loc.isEmpty) return;
-    final url = Uri.parse("https://www.google.com/maps/search/?api=1&query=$loc");
+    final url = Uri.parse("https://www.google.com/maps/search/?api=1&query=$loc?q=$loc"); // Added ?q=$loc to actually search the coordinates
     if (!await launchUrl(url)) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Could not open Maps.")));
     }
   }
 
-  // --- NEW: Popup Dialog for Details ---
   void _showDetailsDialog(Map day) {
     String? inPic = _getValidImageUrl(day['in_photo']);
     String? outPic = _getValidImageUrl(day['out_photo']);
@@ -129,7 +126,7 @@ class _ReportScreenState extends State<ReportScreen> {
             pw.SizedBox(height: 10),
             pw.Text("Summary: Present: ${summary['total_present']} | Absent: ${summary['total_absent']} | Forgot Out: ${summary['forgot_out']}"),
             pw.SizedBox(height: 20),
-            pw.Table.fromTextArray(
+            pw.TableHelper.fromTextArray( // <--- FIXED DEPRECATION
               headers: ['Date', 'Status', 'Time Details'],
               data: dailyData.map((day) => [day['date'], day['status'], day['details']]).toList(),
               headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
@@ -222,12 +219,11 @@ class _ReportScreenState extends State<ReportScreen> {
                 if (day['status'] == 'Forced Out') statusColor = Colors.purple;
 
                 return ListTile(
-                  // --- NEW: Click to open popup ---
                   onTap: () => _showDetailsDialog(day),
                   leading: Text(day['date'].toString().substring(8), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   title: Text(day['status'], style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                   subtitle: Text(day['details']),
-                  trailing: const Icon(Icons.touch_app, color: Colors.grey, size: 20), // Hint to tap
+                  trailing: const Icon(Icons.touch_app, color: Colors.grey, size: 20), 
                 );
               },
             ),

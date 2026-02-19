@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../config.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  _ForgotPasswordScreenState createState() => _ForgotPasswordScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState(); // <--- FIXED
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
@@ -17,16 +18,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _otpSent = false;
   bool _isLoading = false;
 
-  // Step 1: Request OTP
   Future<void> _sendOTP() async {
     if (_userController.text.isEmpty) return;
     setState(() => _isLoading = true);
 
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.1.4:8000/api/forgot-password/"),
+        Uri.parse(Config.forgotPassword),
         body: {"username": _userController.text.trim()}
       );
+      
+      if (!mounted) return; // <--- FIXED ASYNC GAP
+
       var data = jsonDecode(response.body);
 
       if (data['status'] == 'success') {
@@ -36,36 +39,40 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Step 2: Confirm Reset
   Future<void> _resetPassword() async {
     setState(() => _isLoading = true);
     try {
       var response = await http.post(
-        Uri.parse("http://192.168.1.6:8000/api/reset-password-confirm/"),
+        Uri.parse(Config.resetPassword),
         body: {
           "username": _userController.text.trim(),
           "otp": _otpController.text.trim(),
           "new_password": _newPassController.text.trim()
         }
       );
+      
+      if (!mounted) return; // <--- FIXED ASYNC GAP
+
       var data = jsonDecode(response.body);
 
       if (data['status'] == 'success') {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Password Reset! Please Login.")));
-        Navigator.pop(context); // Go back to Login
+        Navigator.pop(context); 
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error Resetting Password")));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -83,7 +90,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             TextField(
               controller: _userController, 
               decoration: const InputDecoration(labelText: "Enter Username", border: OutlineInputBorder()),
-              enabled: !_otpSent, // Disable after OTP sent
+              enabled: !_otpSent, 
             ),
             const SizedBox(height: 20),
 

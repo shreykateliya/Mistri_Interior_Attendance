@@ -1,27 +1,24 @@
-// lib/screens/admin_screen.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'login_screen.dart';
 import 'report_screen.dart'; 
-import '../config.dart'; // <--- We MUST use this
+import '../config.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
 
   @override
-  _AdminScreenState createState() => _AdminScreenState();
+  State<AdminScreen> createState() => _AdminScreenState(); // <--- FIXED
 }
 
 class _AdminScreenState extends State<AdminScreen> {
   List employees = [];
   bool _isLoading = true;
 
-  // Helper for images
   String? _getValidImageUrl(String url) {
     if (url.isEmpty) return null;
     if (url.startsWith('http')) return url;
-    // USE CONFIG, NOT HARDCODED IP
     return "${Config.baseUrl}$url";
   }
 
@@ -32,7 +29,6 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _fetchDashboard() async {
-    // USE CONFIG
     try {
       var response = await http.get(Uri.parse(Config.adminDashboard));
       if (mounted) {
@@ -42,16 +38,16 @@ class _AdminScreenState extends State<AdminScreen> {
         });
       }
     } catch (e) {
-      print("Error: $e");
+      debugPrint("Error: $e"); // <--- FIXED
     }
   }
 
   Future<void> _forceLogout(int empId, String name) async {
     await http.post(Uri.parse(Config.forceLogout), body: {"employee_id": empId.toString()});
     
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Forced logout for $name")));
-    }
+    if (!mounted) return; // <--- FIXED ASYNC GAP
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Forced logout for $name")));
+    
     _fetchDashboard(); 
   }
 

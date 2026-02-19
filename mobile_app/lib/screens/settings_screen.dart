@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -7,24 +6,22 @@ import '../config.dart';
 
 class SettingsScreen extends StatefulWidget {
   final int userId;
-  final String role; // 'admin' or 'employee'
+  final String role; 
 
   const SettingsScreen({super.key, required this.userId, required this.role});
 
   @override
-  _SettingsScreenState createState() => _SettingsScreenState();
+  State<SettingsScreen> createState() => _SettingsScreenState(); // <--- FIXED
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _passController = TextEditingController();
   bool _isLoading = false;
 
-  // 1. Change Password
   Future<void> _changePassword() async {
     if (_passController.text.isEmpty) return;
     setState(() => _isLoading = true);
     
-    // Uses Config
     try {
       await http.post(
         Uri.parse(Config.changePassword),
@@ -34,36 +31,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
           "new_password": _passController.text.trim()
         }
       );
+
+      if (!mounted) return; // <--- FIXED ASYNC GAP
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Password Changed Successfully!")));
       _passController.clear();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error changing password")));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // 2. Upload Profile Pic
   Future<void> _updateProfilePic() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     
     if (pickedFile != null) {
       setState(() => _isLoading = true);
-      // Uses Config
+      
       var request = http.MultipartRequest('POST', Uri.parse(Config.updateProfilePic));
       request.fields['id'] = widget.userId.toString();
       request.files.add(await http.MultipartFile.fromPath('profile_pic', pickedFile.path));
       
       try {
         var response = await request.send();
+        if (!mounted) return; // <--- FIXED ASYNC GAP
         if (response.statusCode == 200) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Pic Updated! (Re-login to see changes)")));
         }
       } catch (e) {
-         print("Error: $e");
+         debugPrint("Error: $e"); // <--- FIXED
       }
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

@@ -5,13 +5,13 @@ import 'attendance_screen.dart';
 import 'admin_screen.dart';
 import 'signup_screen.dart'; 
 import 'forgot_password_screen.dart';
-import '../config.dart'; // <--- Ensure this points to your config.dart
+import '../config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState(); // <--- FIXED
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -23,7 +23,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     setState(() => _isLoading = true);
     
-    // Uses Config.login (No more hardcoded IP or 'url' variable)
     try {
       var response = await http.post(
         Uri.parse(Config.login),
@@ -33,29 +32,27 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       );
 
+      if (!mounted) return; // <--- FIXED ASYNC GAP
+
       var data = jsonDecode(response.body);
 
       if (data['status'] == 'success') {
         if (data['role'] == 'admin') {
-          if (mounted) {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminScreen()));
-          }
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminScreen()));
         } else {
-          if (mounted) {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AttendanceScreen(
-              id: data['id'], 
-              username: data['username'],
-              profilePic: data['profile_pic'],      
-              initialStatus: data['current_status'] 
-            )));
-          }
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AttendanceScreen(
+            id: data['id'], 
+            username: data['username'],
+            profilePic: data['profile_pic'],      
+            initialStatus: data['current_status'] 
+          )));
         }
       } else {
         setState(() => _message = "❌ Login Failed: ${data['message']}");
       }
     } catch (e) {
-      setState(() => _message = "Connection Error. Check IP in config.dart");
-      print("Login Error: $e");
+      if (mounted) setState(() => _message = "Connection Error. Check IP in config.dart");
+      debugPrint("Login Error: $e"); // <--- FIXED
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

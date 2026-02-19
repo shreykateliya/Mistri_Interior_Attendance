@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart'; 
 import 'login_screen.dart';
 import 'settings_screen.dart';
-import 'report_screen.dart'; // <--- ADDED: Import the report screen
+import 'report_screen.dart'; 
 import '../config.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -25,7 +24,7 @@ class AttendanceScreen extends StatefulWidget {
   });
 
   @override
-  _AttendanceScreenState createState() => _AttendanceScreenState();
+  State<AttendanceScreen> createState() => _AttendanceScreenState(); // <--- FIXED
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
@@ -88,27 +87,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       
       request.files.add(await http.MultipartFile.fromPath('live_photo', pickedFile.path));
 
+      // 1. First Async Call
       var response = await request.send();
+      
+      // 2. Second Async Call (Read error body if it failed)
+      String responseBody = "";
+      if (response.statusCode != 201 && response.statusCode != 200) {
+        responseBody = await response.stream.bytesToString();
+      }
+
+      // --- ALL AWAITS ARE DONE. NOW WE CHECK MOUNTED ONCE. ---
+      if (!mounted) return; 
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            _currentStatus = type; 
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text("Successfully Punched $type!"), 
-            backgroundColor: type == 'IN' ? Colors.green : Colors.red
-          ));
-        }
+        setState(() {
+          _currentStatus = type; 
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Successfully Punched $type!"), 
+          backgroundColor: type == 'IN' ? Colors.green : Colors.red
+        ));
       } else {
-        if (mounted) setState(() => _isLoading = false);
-        var responseBody = await response.stream.bytesToString();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed: $responseBody")));
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed: $responseBody")));
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
@@ -122,7 +129,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       appBar: AppBar(
         title: const Text("My Dashboard"),
         actions: [
-          // --- ADDED: History Icon at the top right ---
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
@@ -194,7 +200,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             
             const SizedBox(height: 30),
             
-            // --- ADDED: Big explicit button for the employee to see their history ---
             TextButton.icon(
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => ReportScreen(userId: widget.id, role: 'employee')));
@@ -202,7 +207,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               icon: const Icon(Icons.calendar_month, size: 28), 
               label: const Text("View My Attendance History", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
             )
-
           ],
         ),
       ),

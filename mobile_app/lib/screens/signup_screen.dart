@@ -7,7 +7,7 @@ class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
   @override
-  _SignUpScreenState createState() => _SignUpScreenState();
+  State<SignUpScreen> createState() => _SignUpScreenState(); // <--- FIXED
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
@@ -19,28 +19,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
     try {
       var response = await http.post(
-        Uri.parse(Config.signup), // <--- FIXED: Added comma here
+        Uri.parse(Config.signup), 
         body: {
           "username": _userController.text.trim(),
           "password": _passController.text.trim()
         },
       );
       
+      if (!mounted) return; // <--- FIXED ASYNC GAP
+
       var data = jsonDecode(response.body);
       if (data['status'] == 'success') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account Created! Please Login.")));
-          Navigator.pop(context); // Go back to Login
-        }
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account Created! Please Login.")));
+        Navigator.pop(context); 
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
-        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
