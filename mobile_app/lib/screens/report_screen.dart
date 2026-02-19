@@ -5,11 +5,12 @@ import 'dart:convert';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart'; // <--- NEW
 import '../config.dart';
 
 class ReportScreen extends StatefulWidget {
   final int userId;
-  final String role; // 'admin' or 'employee'
+  final String role; 
 
   const ReportScreen({super.key, required this.userId, required this.role});
 
@@ -45,7 +46,72 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  // Generate PDF (Whole Month)
+  // Helper to fix image URLs
+  String? _getValidImageUrl(String url) {
+    if (url.isEmpty) return null;
+    if (url.startsWith('http')) return url;
+    return "${Config.baseUrl}$url";
+  }
+
+  // --- NEW: Open Google Maps ---
+  Future<void> _openMap(String loc) async {
+    if (loc.isEmpty) return;
+    final url = Uri.parse("https://www.google.com/maps/search/?api=1&query=$loc");
+    if (!await launchUrl(url)) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Could not open Maps.")));
+    }
+  }
+
+  // --- NEW: Popup Dialog for Details ---
+  void _showDetailsDialog(Map day) {
+    String? inPic = _getValidImageUrl(day['in_photo']);
+    String? outPic = _getValidImageUrl(day['out_photo']);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Details for ${day['date']}"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (inPic != null) ...[
+                  const Text("Punch IN", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  Image.network(inPic, height: 150, fit: BoxFit.cover),
+                  const SizedBox(height: 5),
+                  ElevatedButton.icon(
+                    onPressed: () => _openMap(day['in_loc']),
+                    icon: const Icon(Icons.location_on),
+                    label: const Text("View Map Location"),
+                  ),
+                  const Divider(height: 30),
+                ],
+                if (outPic != null) ...[
+                  const Text("Punch OUT", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  Image.network(outPic, height: 150, fit: BoxFit.cover),
+                  const SizedBox(height: 5),
+                  ElevatedButton.icon(
+                    onPressed: () => _openMap(day['out_loc']),
+                    icon: const Icon(Icons.location_on),
+                    label: const Text("View Map Location"),
+                  ),
+                ],
+                if (inPic == null && outPic == null)
+                  const Text("No photo or location data recorded for this day."),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("CLOSE"))
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _generatePdf() async {
     final doc = pw.Document();
     final List<dynamic> dailyData = _reportData['daily_data'];
@@ -93,10 +159,9 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
       body: Column(
         children: [
-          // 1. Calendar
           TableCalendar(
             firstDay: DateTime.utc(2024, 1, 1),
-            lastDay: DateTime.now(), // Stop at today to avoid future scrolling if desired
+            lastDay: DateTime.now(), 
             focusedDay: _focusedDay,
             calendarFormat: CalendarFormat.month,
             onPageChanged: (focusedDay) {
@@ -105,7 +170,6 @@ class _ReportScreenState extends State<ReportScreen> {
             },
             calendarBuilders: CalendarBuilders(
               markerBuilder: (context, date, events) {
-                // Find status for this date
                 var dayData = dailyData.firstWhere((d) => d['day'] == date.day, orElse: () => null);
                 
                 if (dayData != null) {
@@ -113,7 +177,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   if (dayData['status'] == 'Present') color = Colors.green;
                   if (dayData['status'] == 'Absent') color = Colors.red;
                   if (dayData['status'] == 'Forgot Out') color = Colors.orange;
-                  if (dayData['status'] == 'Forced Out') color = Colors.purple; // New Color
+                  if (dayData['status'] == 'Forced Out') color = Colors.purple;
                   
                   return Positioned(
                     bottom: 1,
@@ -130,7 +194,6 @@ class _ReportScreenState extends State<ReportScreen> {
           
           const Divider(),
           
-          // 2. Summary Cards
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Row(
@@ -139,21 +202,19 @@ class _ReportScreenState extends State<ReportScreen> {
                 _summaryCard("Present", "${summary['total_present']}", Colors.green),
                 _summaryCard("Absent", "${summary['total_absent']}", Colors.red),
                 _summaryCard("Missed", "${summary['forgot_out']}", Colors.orange),
-                _summaryCard("Forced", "${summary['forced_out'] ?? 0}", Colors.purple), // New Card
+                _summaryCard("Forced", "${summary['forced_out'] ?? 0}", Colors.purple), 
               ],
             ),
           ),
           
           const Divider(),
           
-          // 3. List View
           Expanded(
             child: ListView.builder(
               itemCount: dailyData.length,
               itemBuilder: (context, index) {
                 var day = dailyData[index];
                 
-                // Colors for text
                 Color statusColor = Colors.grey;
                 if (day['status'] == 'Present') statusColor = Colors.green;
                 if (day['status'] == 'Absent') statusColor = Colors.red;
@@ -161,10 +222,12 @@ class _ReportScreenState extends State<ReportScreen> {
                 if (day['status'] == 'Forced Out') statusColor = Colors.purple;
 
                 return ListTile(
+                  // --- NEW: Click to open popup ---
+                  onTap: () => _showDetailsDialog(day),
                   leading: Text(day['date'].toString().substring(8), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   title: Text(day['status'], style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                   subtitle: Text(day['details']),
-                  // Deleted the Trailing Delete Button here
+                  trailing: const Icon(Icons.touch_app, color: Colors.grey, size: 20), // Hint to tap
                 );
               },
             ),

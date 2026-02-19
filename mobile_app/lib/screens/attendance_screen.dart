@@ -1,4 +1,3 @@
-// lib/screens/attendance_screen.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -8,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart'; 
 import 'login_screen.dart';
 import 'settings_screen.dart';
+import 'report_screen.dart'; // <--- ADDED: Import the report screen
 import '../config.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -32,7 +32,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String _currentStatus = "OUT"; 
   String _timeString = "";
   bool _isLoading = false;
-  Timer? _timer; // Variable to hold the timer
+  Timer? _timer; 
 
   String? _getValidImageUrl(String url) {
     if (url.isEmpty) return null;
@@ -45,17 +45,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     super.initState();
     _currentStatus = widget.initialStatus;
     _timeString = _formatDateTime(DateTime.now());
-    // Assign timer to variable so we can cancel it later
     _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) => _getTime());
   }
 
-  // --- CRITICAL FIX: Kill the timer when leaving screen ---
   @override
   void dispose() {
     _timer?.cancel(); 
     super.dispose();
   }
-  // --------------------------------------------------------
 
   void _getTime() {
     final DateTime now = DateTime.now();
@@ -125,6 +122,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       appBar: AppBar(
         title: const Text("My Dashboard"),
         actions: [
+          // --- ADDED: History Icon at the top right ---
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => ReportScreen(userId: widget.id, role: 'employee')));
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -166,9 +170,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ),
             ),
             
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
             Text(_timeString, style: const TextStyle(fontSize: 45, fontWeight: FontWeight.w300, fontFamily: 'monospace')),
-            const SizedBox(height: 50),
+            const SizedBox(height: 30),
 
             _isLoading 
               ? const CircularProgressIndicator()
@@ -187,6 +191,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
                   ),
                 ),
+            
+            const SizedBox(height: 30),
+            
+            // --- ADDED: Big explicit button for the employee to see their history ---
+            TextButton.icon(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ReportScreen(userId: widget.id, role: 'employee')));
+              }, 
+              icon: const Icon(Icons.calendar_month, size: 28), 
+              label: const Text("View My Attendance History", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
+            )
+
           ],
         ),
       ),

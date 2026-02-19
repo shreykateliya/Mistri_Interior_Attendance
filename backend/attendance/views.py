@@ -206,6 +206,8 @@ def force_logout(request):
 
 # backend/attendance/views.py
 
+# backend/attendance/views.py
+
 @api_view(['GET'])
 def monthly_report(request):
     emp_id = request.query_params.get('employee_id')
@@ -214,48 +216,45 @@ def monthly_report(request):
     
     try:
         emp = Employee.objects.get(id=emp_id)
-        
-        # 1. Get all logs for this month
         logs = AttendanceLog.objects.filter(
-            employee=emp, 
-            timestamp__month=month, 
-            timestamp__year=year
+            employee=emp, timestamp__month=month, timestamp__year=year
         ).order_by('timestamp')
         
-        # 2. Setup Data
         report = []
         num_days = calendar.monthrange(year, month)[1]
         today = datetime.now()
         
-        present_days = 0
-        missed_out_days = 0
-        forced_out_days = 0 # New Counter
+        present_days, missed_out_days, forced_out_days = 0, 0, 0
         
-        # Group logs by day
         logs_by_day = {}
         for log in logs:
             day = log.timestamp.day
             if day not in logs_by_day: logs_by_day[day] = []
             logs_by_day[day].append(log)
             
-        # 3. Process Day by Day
         for day in range(1, num_days + 1):
-            # Stop processing if date is in the future
-            current_date = datetime(year, month, day)
-            if current_date > today:
+            if datetime(year, month, day) > today:
                 break 
 
             day_logs = logs_by_day.get(day, [])
             status = "Absent"
             details = "-"
             
+            # Variables to hold photo and location
+            in_photo, out_photo, in_loc, out_loc = "", "", "", ""
+            
             if day_logs:
                 first_in = next((l for l in day_logs if l.type == 'IN'), None)
                 last_out = next((l for l in reversed(day_logs) if l.type == 'OUT'), None)
                 
                 if first_in:
+                    in_photo = first_in.live_photo.url if first_in.live_photo else ""
+                    in_loc = f"{first_in.latitude},{first_in.longitude}" if first_in.latitude else ""
+                    
                     if last_out:
-                        # Check if it was forced
+                        out_photo = last_out.live_photo.url if last_out.live_photo else ""
+                        out_loc = f"{last_out.latitude},{last_out.longitude}" if last_out.latitude else ""
+                        
                         if last_out.forced_by_admin:
                             status = "Forced Out"
                             details = f"{first_in.timestamp.strftime('%H:%M')} - {last_out.timestamp.strftime('%H:%M')} (Admin)"
@@ -274,7 +273,11 @@ def monthly_report(request):
                 "day": day,
                 "date": f"{year}-{month:02d}-{day:02d}",
                 "status": status,
-                "details": details
+                "details": details,
+                "in_photo": in_photo,    # <--- NEW
+                "out_photo": out_photo,  # <--- NEW
+                "in_loc": in_loc,        # <--- NEW
+                "out_loc": out_loc       # <--- NEW
             })
             
         return Response({
@@ -290,7 +293,7 @@ def monthly_report(request):
 
     except Employee.DoesNotExist:
         return Response({"error": "Employee not found"}, status=400)
-
+    
 @api_view(['DELETE'])
 def delete_log(request, log_id):
     try:

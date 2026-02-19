@@ -1,6 +1,6 @@
 class Config {
   // CHANGE THIS ONE LINE whenever your IP changes
-  static const String baseUrl = "http://192.168.1.4:8000"; 
+  static const String baseUrl = "http://192.168.1.3:8000"; 
   
   // API Endpoints
   static const String login = "$baseUrl/api/login/";
